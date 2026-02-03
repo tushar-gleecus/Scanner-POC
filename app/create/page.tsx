@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Plus, Trash2, Save, Download, RefreshCw } from "lucide-react";
 import QRCode from "qrcode";
-import Barcode from "react-barcode";
 import { saveForm, FormField } from "@/utils/storage";
+import QRCodeGenerator from "@/components/generators/QRCodeGenerator";
+import BarcodeGenerator from "@/components/generators/BarcodeGenerator";
 
 const BulkResultItem = ({
   item,
@@ -16,34 +17,24 @@ const BulkResultItem = ({
   downloadImage: (url: string, name: string) => void;
   selectedFormats: { qr: boolean; code39: boolean; code128: boolean };
 }) => {
-  const code39Ref = useRef<HTMLDivElement>(null);
-  const code128Ref = useRef<HTMLDivElement>(null);
-
-  const handleDownloadBarcode = (
-    ref: React.RefObject<HTMLDivElement | null>,
-    format: string,
-  ) => {
-    if (ref.current) {
-      const svg = ref.current.querySelector("svg");
-      if (svg) {
-        const svgData = new XMLSerializer().serializeToString(svg);
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const img = new Image();
-        img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          if (ctx) {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
-          }
-          const pngFile = canvas.toDataURL("image/png");
-          downloadImage(pngFile, `barcode-${format}-${item.id}.png`);
-        };
-        img.src = "data:image/svg+xml;base64," + btoa(svgData);
+  // Helper for barcode download bridging
+  const downloadBarcode = (svg: SVGSVGElement, name: string) => {
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0);
       }
-    }
+      const pngFile = canvas.toDataURL("image/png");
+      downloadImage(pngFile, name);
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(svgData);
   };
 
   return (
@@ -55,77 +46,29 @@ const BulkResultItem = ({
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-12 w-full">
-        {/* QR Preview (Larger) */}
+        {/* 2D Codes */}
         {selectedFormats.qr && item.qrUrl && (
-          <div className="flex flex-col items-center space-y-4">
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <img
-                src={item.qrUrl}
-                alt="QR"
-                className="w-48 h-48 mix-blend-multiply"
-              />
-            </div>
-            <button
-              onClick={() => downloadImage(item.qrUrl!, `qr-${item.id}.png`)}
-              className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" /> QR
-            </button>
-          </div>
+          <QRCodeGenerator
+            url={item.qrUrl}
+            id={item.id}
+            onDownload={downloadImage}
+          />
         )}
 
-        {/* Code 39 Preview (Full Size) */}
+        {/* 1D Barcodes */}
         {selectedFormats.code39 && (
-          <div className="flex flex-col items-center space-y-4">
-            <div
-              ref={code39Ref}
-              className="bg-white p-4 rounded-lg shadow-sm overflow-hidden flex items-center justify-center min-w-[300px]"
-            >
-              <Barcode
-                value={item.id.toUpperCase()}
-                width={3}
-                height={100}
-                displayValue={false}
-                format="CODE39"
-                margin={10}
-                background="#ffffff"
-              />
-            </div>
-            <div className="text-sm font-mono text-gray-400">{item.id}</div>
-            <button
-              onClick={() => handleDownloadBarcode(code39Ref, "CODE39")}
-              className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" /> Code39
-            </button>
-          </div>
+          <BarcodeGenerator
+            id={item.id}
+            format="CODE39"
+            onDownload={downloadBarcode}
+          />
         )}
-
-        {/* Code 128 Preview (Full Size) */}
         {selectedFormats.code128 && (
-          <div className="flex flex-col items-center space-y-4">
-            <div
-              ref={code128Ref}
-              className="bg-white p-4 rounded-lg shadow-sm overflow-hidden flex items-center justify-center min-w-[300px]"
-            >
-              <Barcode
-                value={item.id.toUpperCase()}
-                width={3}
-                height={100}
-                displayValue={false}
-                format="CODE128"
-                margin={10}
-                background="#ffffff"
-              />
-            </div>
-            <div className="text-sm font-mono text-gray-400">{item.id}</div>
-            <button
-              onClick={() => handleDownloadBarcode(code128Ref, "CODE128")}
-              className="flex items-center px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" /> Code128
-            </button>
-          </div>
+          <BarcodeGenerator
+            id={item.id}
+            format="CODE128"
+            onDownload={downloadBarcode}
+          />
         )}
       </div>
     </div>
@@ -136,6 +79,15 @@ export default function CreatePage() {
   const [fields, setFields] = useState<FormField[]>([
     { id: uuidv4(), label: "Item Name", value: "" },
     { id: uuidv4(), label: "Price", value: "" },
+    {
+      id: uuidv4(),
+      label: "Date Added",
+      value: new Date().toISOString().split("T")[0],
+    },
+    { id: uuidv4(), label: "Description", value: "" },
+    { id: uuidv4(), label: "Manufacturer", value: "" },
+    { id: uuidv4(), label: "Weight", value: "" },
+    { id: uuidv4(), label: "Count", value: "" },
   ]);
   const [generatedId, setGeneratedId] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
@@ -180,6 +132,26 @@ export default function CreatePage() {
   };
 
   /* CSV Handling - Read File Only */
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "Item Name",
+      "Price",
+      "Date Added",
+      "Description",
+      "Manufacturer",
+      "Weight",
+      "Count",
+    ];
+    const csvContent = "data:text/csv;charset=utf-8," + headers.join(",");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.href = encodedUri;
+    link.download = "bulk_upload_template.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -284,6 +256,15 @@ export default function CreatePage() {
     setFields([
       { id: uuidv4(), label: "Item Name", value: "" },
       { id: uuidv4(), label: "Price", value: "" },
+      {
+        id: uuidv4(),
+        label: "Date Added",
+        value: new Date().toISOString().split("T")[0],
+      },
+      { id: uuidv4(), label: "Description", value: "" },
+      { id: uuidv4(), label: "Manufacturer", value: "" },
+      { id: uuidv4(), label: "Weight", value: "" },
+      { id: uuidv4(), label: "Count", value: "" },
     ]);
     setQrCodeUrl("");
     setCsvData(null);
@@ -385,40 +366,26 @@ export default function CreatePage() {
 
           <div className="grid grid-cols-1 gap-8 pt-6">
             {/* Display All Selected Formats */}
-
-            {/* QR Code */}
             {selectedFormats.qr && qrCodeUrl && (
-              <div className="flex flex-col items-center space-y-4 p-4 border rounded-lg bg-gray-50">
-                <h3 className="font-semibold text-gray-700">QR Code</h3>
-                <img
-                  src={qrCodeUrl}
-                  alt="QR Code"
-                  className="w-48 h-48 mix-blend-multiply"
-                />
-                <button
-                  onClick={() =>
-                    downloadImage(qrCodeUrl, `qr-${generatedId}.png`)
-                  }
-                  className="flex items-center px-4 py-2 text-sm text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100"
-                >
-                  <Download className="w-4 h-4 mr-2" /> Download QR
-                </button>
-              </div>
+              <QRCodeGenerator
+                url={qrCodeUrl}
+                id={generatedId}
+                onDownload={downloadImage}
+              />
             )}
 
-            {/* 1D Barcodes */}
             {selectedFormats.code39 && (
-              <BarcodeDisplay
+              <BarcodeGenerator
                 id={generatedId}
                 format="CODE39"
-                downloadFn={downloadBarcodeFromSvg}
+                onDownload={downloadBarcodeFromSvg}
               />
             )}
             {selectedFormats.code128 && (
-              <BarcodeDisplay
+              <BarcodeGenerator
                 id={generatedId}
                 format="CODE128"
-                downloadFn={downloadBarcodeFromSvg}
+                onDownload={downloadBarcodeFromSvg}
               />
             )}
           </div>
@@ -456,7 +423,7 @@ export default function CreatePage() {
             className={`p-6 border-2 border-dashed rounded-lg flex flex-col items-center text-center space-y-4 transition-colors ${csvData ? "border-green-400 bg-green-50" : "border-indigo-200 bg-indigo-50"}`}
           >
             <p className="text-sm text-indigo-800 font-medium">
-              Bulk Create from CSV
+              Bulk import from CSV
             </p>
 
             {!csvData ? (
@@ -471,12 +438,20 @@ export default function CreatePage() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-2 text-sm font-semibold text-indigo-600 hover:text-indigo-800 underline"
-                >
-                  Select CSV File
-                </button>
+                <div className="flex flex-col sm:flex-row gap-4 items-center mt-2">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 text-sm font-semibold text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50 transition-colors"
+                  >
+                    Select CSV File
+                  </button>
+                  <button
+                    onClick={handleDownloadTemplate}
+                    className="px-4 py-2 text-sm font-semibold text-indigo-600 border border-indigo-600 rounded-md hover:bg-indigo-50 transition-colors"
+                  >
+                    Download Template
+                  </button>
+                </div>
               </>
             ) : (
               <div className="flex flex-col items-center space-y-2">
@@ -553,41 +528,60 @@ export default function CreatePage() {
           )}
 
           <div className="flex flex-col space-y-6 pt-6 border-t border-gray-100">
-            {/* Format Selection (Checkboxes) */}
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">
+            {/* Format Selection (Grouped) */}
+            <div className="bg-gray-50 p-6 rounded-lg border border-gray-100 space-y-6">
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-2">
                 Select Formats to Generate
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={selectedFormats.qr}
-                    onChange={() => handleFormatChange("qr")}
-                    className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="font-medium text-gray-700">QR Code</span>
-                </label>
 
-                <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={selectedFormats.code39}
-                    onChange={() => handleFormatChange("code39")}
-                    className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="font-medium text-gray-700">Code 39</span>
-                </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* 1D Barcodes Section */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase">
+                    1D Barcodes
+                  </h4>
+                  <div className="space-y-3">
+                    <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedFormats.code39}
+                        onChange={() => handleFormatChange("code39")}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="font-medium text-gray-700">Code 39</span>
+                    </label>
 
-                <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={selectedFormats.code128}
-                    onChange={() => handleFormatChange("code128")}
-                    className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="font-medium text-gray-700">Code 128</span>
-                </label>
+                    <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedFormats.code128}
+                        onChange={() => handleFormatChange("code128")}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="font-medium text-gray-700">
+                        Code 128
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 2D Codes Section */}
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase">
+                    2D Codes
+                  </h4>
+                  <div className="space-y-3">
+                    <label className="flex items-center space-x-3 p-3 bg-white border border-gray-200 rounded-md cursor-pointer hover:border-indigo-300 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedFormats.qr}
+                        onChange={() => handleFormatChange("qr")}
+                        className="h-5 w-5 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <span className="font-medium text-gray-700">QR Code</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -605,7 +599,7 @@ export default function CreatePage() {
                 {/* Logic: if CSV mode, Add Field is hidden, so button should be right aligned. If manual, it's space-between. This works. */}
                 <button
                   onClick={handleSaveAndGenerate}
-                  className={`flex items-center px-8 py-3 text-base font-bold text-white bg-indigo-600 rounded-full shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:scale-105 active:scale-95 ${!selectedFormats.qr && !selectedFormats.code39 && !selectedFormats.code128 ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className={`flex items-center px-3 py-2 text-base font-bold text-white bg-indigo-600 rounded-lg shadow-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all transform hover:scale-105 active:scale-95 ${!selectedFormats.qr && !selectedFormats.code39 && !selectedFormats.code128 ? "opacity-50 cursor-not-allowed" : ""}`}
                   disabled={
                     !selectedFormats.qr &&
                     !selectedFormats.code39 &&
@@ -625,45 +619,3 @@ export default function CreatePage() {
 }
 
 // Sub-component for single barcode display
-const BarcodeDisplay = ({
-  id,
-  format,
-  downloadFn,
-}: {
-  id: string;
-  format: string;
-  downloadFn: any;
-}) => {
-  const ref = useRef<HTMLDivElement>(null);
-  return (
-    <div className="flex flex-col items-center space-y-4 p-4 border rounded-lg bg-white w-full overflow-hidden">
-      <h3 className="font-semibold text-gray-700 antialiased">
-        Barcode ({format})
-      </h3>
-      <div
-        ref={ref}
-        className="bg-white p-2 rounded w-full overflow-x-auto flex justify-center"
-      >
-        <Barcode
-          value={id.toUpperCase()}
-          width={3}
-          height={100}
-          displayValue={false}
-          format={format as any}
-          margin={10}
-          background="#ffffff"
-        />
-      </div>
-      <p className="text-xs text-gray-400 font-mono break-all px-2">{id}</p>
-      <button
-        onClick={() => {
-          const svg = ref.current?.querySelector("svg");
-          if (svg) downloadFn(svg, `barcode-${format}-${id}.png`);
-        }}
-        className="flex items-center px-4 py-2 text-sm text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100"
-      >
-        <Download className="w-4 h-4 mr-2" /> Download
-      </button>
-    </div>
-  );
-};

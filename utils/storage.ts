@@ -9,6 +9,7 @@ export interface FormData {
   createdAt: number;
   updatedAt: number;
   fields: FormField[];
+  recommendation?: string;
 }
 
 const STORAGE_KEY = "qr_form_app_data";
@@ -50,6 +51,7 @@ export const saveForm = (fields: FormField[]): FormData => {
 export const updateForm = (
   id: string,
   fields: FormField[],
+  recommendation?: string,
 ): FormData | null => {
   const forms = getAllForms();
   const index = forms.findIndex((f) => f.id === id);
@@ -60,6 +62,7 @@ export const updateForm = (
     ...forms[index],
     updatedAt: Date.now(),
     fields,
+    recommendation,
   };
 
   forms[index] = updatedForm;
