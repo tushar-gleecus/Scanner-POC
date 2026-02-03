@@ -4,9 +4,9 @@ import { QrCode, Scan } from "lucide-react";
 export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] space-y-8">
-      <h1 className="text-4xl font-bold text-white">Unity Platform</h1>
+      <h1 className="text-4xl font-bold text-blue-600">Unity Platform</h1>
       <p className="text-xl text-white-600">
-        Create forms, generate codes, and scan to edit.
+        Create forms, generate codes, and scan.
       </p>
 
       <div className="flex space-x-6">

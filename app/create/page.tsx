@@ -409,11 +409,11 @@ export default function CreatePage() {
     <div className="max-w-2xl mx-auto">
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden">
         <div className="px-6 py-8 sm:p-10 bg-indigo-600">
-          <h2 className="text-3xl font-extrabold text-white">
-            Create New Form
+          <h2 className="text-2xl font-extrabold text-white">
+            Product Data
           </h2>
           <p className="mt-2 text-indigo-200">
-            Add fields to store information and generate codes.
+            Add fields or upload CSV to store information and generate codes.
           </p>
         </div>
 
